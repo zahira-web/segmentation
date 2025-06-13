@@ -5,8 +5,10 @@ from tensorflow.keras.models import load_model
 from PIL import Image
 import numpy as np
 import os
+import subprocess
 
-MODEL_PATH = "unet_model.keras"  # your model filename here
+MODEL_PATH = "unet_model.keras"
+GDRIVE_ID = "1cVa9hNetMAQZyQUUoVM5y9AA4yjM048K"  
 
 def dice_coef(y_true, y_pred, smooth=1):
     y_true_f = K.flatten(y_true)
@@ -18,26 +20,46 @@ def dice_loss(y_true, y_pred):
     return 1 - dice_coef(y_true, y_pred)
 
 @st.cache_resource
-def load_my_model():
+def download_model():
+    if not os.path.exists(MODEL_PATH):
+        st.info("Downloading model from Google Drive...")
+        # Install gdown if not present
+        subprocess.run(["pip", "install", "gdown"], check=True)
+        # Download model
+        subprocess.run(["gdown", "--id", GDRIVE_ID, "-O", MODEL_PATH], check=True)
+        st.success("Model downloaded successfully!")
+
+@st.cache_resource
+def load_unet_model():
+    download_model()
     model = load_model(MODEL_PATH, custom_objects={'dice_coef': dice_coef, 'dice_loss': dice_loss})
     return model
 
-if not os.path.exists(MODEL_PATH):
-    st.error(f"Model file {MODEL_PATH} not found. Please download or upload it.")
-else:
-    model = load_my_model()
-    st.title("Brain Tumor Segmentation")
+def preprocess_image(image, target_size=(128, 128)):
+    image = image.convert("L").resize(target_size)
+    img_array = np.array(image) / 255.0
+    img_array = np.expand_dims(img_array, axis=(0, -1))
+    return img_array
 
-    uploaded_file = st.file_uploader("Upload MRI Image", type=["png", "jpg", "jpeg"])
-    if uploaded_file:
-        image = Image.open(uploaded_file).convert("L")  # grayscale for 1 channel
-        image_resized = image.resize((128, 128))
-        st.image(image_resized, caption="Input Image", use_column_width=True)
+def postprocess_mask(mask):
+    mask = (mask > 0.5).astype(np.uint8) * 255
+    return mask
 
-        img_array = np.array(image_resized) / 255.0
-        img_array = np.expand_dims(img_array, axis=(0, -1))  # shape: (1, 128, 128, 1)
+def main():
+    st.title("Brain Tumor Segmentation with U-Net")
 
-        pred_mask = model.predict(img_array)[0, :, :, 0]
-        pred_mask = (pred_mask > 0.5).astype(np.uint8) * 255
+    model = load_unet_model()
 
-        st.image(pred_mask, caption="Predicted Tumor Mask", use_column_width=True)
+    uploaded_file = st.file_uploader("Upload a brain MRI image (png, jpg, jpeg)", type=["png", "jpg", "jpeg"])
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Uploaded Image", use_column_width=True)
+
+        img_array = preprocess_image(image)
+        prediction = model.predict(img_array)[0, :, :, 0]
+
+        mask_img = postprocess_mask(prediction)
+        st.image(mask_img, caption="Predicted Tumor Mask", use_column_width=True)
+
+if __name__ == "__main__":
+    main()
