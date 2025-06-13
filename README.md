@@ -1,6 +1,5 @@
 # segmentation
 ## Download Model
-## Model Download
 
 Due to GitHub's file size limit, the trained model is stored externally.
 
