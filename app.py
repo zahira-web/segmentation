@@ -1,43 +1,43 @@
 import streamlit as st
-import numpy as np
-from PIL import Image
 import tensorflow as tf
+from tensorflow.keras import backend as K
+from tensorflow.keras.models import load_model
+from PIL import Image
+import numpy as np
 import os
 
-MODEL_PATH = "unet_model.keras"
-FILE_ID = "1yR9Gar8U0VDRq9gbHiO_W8oZFupf3sjO"
+MODEL_PATH = "unet_model.keras"  # your model filename here
 
-def download_model():
-    import gdown
-    url = f"https://drive.google.com/uc?id={FILE_ID}"
-    output = MODEL_PATH
-    gdown.download(url, output, quiet=False)
+def dice_coef(y_true, y_pred, smooth=1):
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
+    intersection = K.sum(y_true_f * y_pred_f)
+    return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
 
-# Check and download model if necessary
-if not os.path.exists(MODEL_PATH):
-    with st.spinner("Downloading model..."):
-        download_model()
+def dice_loss(y_true, y_pred):
+    return 1 - dice_coef(y_true, y_pred)
 
 @st.cache_resource
-def load_model():
-    model = tf.keras.models.load_model(MODEL_PATH)
+def load_my_model():
+    model = load_model(MODEL_PATH, custom_objects={'dice_coef': dice_coef, 'dice_loss': dice_loss})
     return model
 
-model = load_model()
+if not os.path.exists(MODEL_PATH):
+    st.error(f"Model file {MODEL_PATH} not found. Please download or upload it.")
+else:
+    model = load_my_model()
+    st.title("Brain Tumor Segmentation")
 
-st.title("🧠 Brain Tumor Segmentation App (MRI)")
+    uploaded_file = st.file_uploader("Upload MRI Image", type=["png", "jpg", "jpeg"])
+    if uploaded_file:
+        image = Image.open(uploaded_file).convert("L")  # grayscale for 1 channel
+        image_resized = image.resize((128, 128))
+        st.image(image_resized, caption="Input Image", use_column_width=True)
 
-uploaded_file = st.file_uploader("Upload an MRI Image", type=["jpg", "jpeg", "png"])
+        img_array = np.array(image_resized) / 255.0
+        img_array = np.expand_dims(img_array, axis=(0, -1))  # shape: (1, 128, 128, 1)
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Uploaded MRI Image", use_column_width=True)
+        pred_mask = model.predict(img_array)[0, :, :, 0]
+        pred_mask = (pred_mask > 0.5).astype(np.uint8) * 255
 
-    img_resized = image.resize((128, 128))  # Adapt if needed
-    img_array = np.array(img_resized) / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
-
-    prediction = model.predict(img_array)[0]
-    prediction_mask = (prediction > 0.5).astype(np.uint8) * 255
-
-    st.image(prediction_mask.squeeze(), caption="🧠 Tumor Segmentation Mask", use_column_width=True)
+        st.image(pred_mask, caption="Predicted Tumor Mask", use_column_width=True)
