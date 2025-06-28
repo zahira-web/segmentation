@@ -8,8 +8,8 @@ import tensorflow.keras.backend as K
 import gdown
 
 # -------- Constants --------
-MODEL_DRIVE_ID = "1VMm-KvWBUpCdrRCB1O9xCacGgr8R_2iO"
-MODEL_PATH = "best_model.h5"
+MODEL_DRIVE_ID = "1hPOZ90Uc054k7uygkQKlL0feIQ6UaiYt"
+MODEL_PATH = "unet_model.h5"
 IMG_SIZE = (128, 128)
 
 # -------- Custom dice functions --------
