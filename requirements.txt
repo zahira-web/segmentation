@@ -4,4 +4,3 @@ numpy
 pillow
 opencv-python
 gdown
-tensorflow==2.15.0
