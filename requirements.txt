@@ -1,6 +1,12 @@
 streamlit
-tensorflow
-numpy
-pillow
 opencv-python
 gdown
+tensorflow==2.13.0
+numpy
+matplotlib
+pillow
+opencv-python
+scikit-learn
+tqdm
+pandas
+scikit-image
